@@ -1,0 +1,6 @@
+{
+  "name": "Joinville nos Trilhos: Locomotiva 3D & Cidade Inclusiva",
+  "description": "Simulador 3D interativo de engenharia da locomotiva, modelo CAD FreeCAD, urbanismo acessível para Joinville e jogo de condução com NPCs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
