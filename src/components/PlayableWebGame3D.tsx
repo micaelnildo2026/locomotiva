@@ -292,40 +292,102 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       stGroup.lookAt(stPt.clone().add(stTangent));
 
       // Raised Platform (NBR 9050 Level Boarding)
-      const platGeom = new THREE.BoxGeometry(4.0, 0.9, 32);
+      // Largura da plataforma: 4.6m, posicionada em X = 4.4, com borda segura em X = 2.1m
+      // Garante distância ideal de embarque em nível sem qualquer colisão com os cilindros ou rodas da locomotiva
+      const platGeom = new THREE.BoxGeometry(4.6, 0.9, 36);
       const platMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.7 });
       const platform = new THREE.Mesh(platGeom, platMat);
-      platform.position.set(3.2, 0.45, 0);
+      platform.position.set(4.4, 0.45, 0);
       stGroup.add(platform);
 
-      // Tactile Paving Strip (Yellow Podotátil NBR 9050)
-      const tactileGeom = new THREE.BoxGeometry(0.35, 0.02, 32);
+      // Tactile Paving Strip (Piso Podotátil de Alerta Amarelo NBR 9050)
+      const tactileGeom = new THREE.BoxGeometry(0.35, 0.02, 36);
       const tactileMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.5 });
       const tactile = new THREE.Mesh(tactileGeom, tactileMat);
-      tactile.position.set(1.4, 0.91, 0);
+      tactile.position.set(2.45, 0.91, 0);
       stGroup.add(tactile);
 
-      // Station Canopy / Modern Glass Roof
-      const canopy = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.2, 30), new THREE.MeshStandardMaterial({ color: 0x0284c7, transparent: true, opacity: 0.7 }));
-      canopy.position.set(3.2, 3.8, 0);
+      // Edifício Histórico da Estação de Joinville (Alvenaria e Estilo Arquitetônico Ferroviário)
+      const buildingMat = new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.8 }); // Terracota / Tijolos
+      const stationBuilding = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.8, 28), buildingMat);
+      stationBuilding.position.set(8.5, 2.4, 0);
+      stGroup.add(stationBuilding);
+
+      // Telhado Germânico Colonial do Edifício de Passageiros
+      const bRoofMat = new THREE.MeshStandardMaterial({ color: 0x7c2d12, roughness: 0.7 });
+      const bRoof = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), bRoofMat);
+      bRoof.rotation.y = Math.PI / 4;
+      bRoof.scale.set(1.4, 1.0, 7.2);
+      bRoof.position.set(8.5, 5.6, 0);
+      stGroup.add(bRoof);
+
+      // Portas e Acessos Arqueados para Passageiros
+      [-8, 0, 8].forEach(wz => {
+        const door = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 1.8), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
+        door.position.set(6.65, 1.2, wz);
+        stGroup.add(door);
+      });
+
+      // TELHADO DA GARE / COBERTURA DA PLATAFORMA (Gabarito Ferroviário Elevado)
+      // Altura livre total: o telhado é posicionado em Y = 6.0m até 6.8m!
+      // A locomotiva possui altura máxima de 4.25m, deixando mais de 1.75m de vão livre
+      // A locomotiva jamais corta ou passa através do telhado da estação!
+      const canopyMat = new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        metalness: 0.25,
+        roughness: 0.2,
+        transparent: true,
+        opacity: 0.8
+      });
+      const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.18, 34), canopyMat);
+      canopy.position.set(4.6, 6.0, 0);
+      canopy.rotation.z = -0.06; // Leve caimento para escoamento pluvial
       stGroup.add(canopy);
 
-      // Pillars
-      for (let pz = -12; pz <= 12; pz += 8) {
-        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 3.8), new THREE.MeshStandardMaterial({ color: 0x334155 }));
-        pillar.position.set(4.5, 1.9, pz);
+      // Cumeeira metálica de proteção da marquise
+      const canopyRidge = new THREE.Mesh(
+        new THREE.BoxGeometry(0.25, 0.25, 34),
+        new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
+      );
+      canopyRidge.position.set(2.3, 6.15, 0);
+      stGroup.add(canopyRidge);
+
+      // Pilares e Tesouras Metálicas Estruturais (Gabarito Ferroviário Livre)
+      const pillarMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.3 });
+      for (let pz = -14; pz <= 14; pz += 7) {
+        // Pilar vertical recuado com segurança na plataforma
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.2, 12), pillarMat);
+        pillar.position.set(5.5, 3.5, pz);
         stGroup.add(pillar);
+
+        // Viga horizontal de suporte estrutural sob a marquise (Y = 5.9m)
+        const trussBeam = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.12), pillarMat);
+        trussBeam.position.set(4.0, 5.9, pz);
+        stGroup.add(trussBeam);
+
+        // Mão-francesa de reforço estrutural
+        const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 8), pillarMat);
+        brace.rotation.z = Math.PI / 4;
+        brace.position.set(4.7, 5.3, pz);
+        stGroup.add(brace);
       }
 
-      // Station Signboard
-      const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 4.0), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-      signMesh.position.set(1.4, 2.6, 0);
+      // Placa de Identificação da Estação (Fixada em altura segura com vão livre completo)
+      const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 5.2), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
+      signMesh.position.set(3.8, 4.4, 0);
       stGroup.add(signMesh);
+
+      const signBorder = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.95, 5.3),
+        new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.4 })
+      );
+      signBorder.position.set(3.78, 4.4, 0);
+      stGroup.add(signBorder);
 
       // 3D PASSENGERS ON PLATFORM:
       // 1. Lucas (PCD Wheelchair User) at the level boarding position
       const wcGroup = new THREE.Group();
-      wcGroup.position.set(2.4, 0.91, 3.5);
+      wcGroup.position.set(3.2, 0.91, 3.5);
       wcGroup.rotation.y = -Math.PI / 2; // Facing the train
       [-0.28, 0.28].forEach(wx => {
         const wheel = new THREE.Mesh(
@@ -347,7 +409,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
       // 2. Dona Helena (Senior Passenger with walking cane)
       const seniorGroup = new THREE.Group();
-      seniorGroup.position.set(3.4, 0.91, -3.5);
+      seniorGroup.position.set(4.0, 0.91, -3.5);
       const sTorso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.2), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
       sTorso.position.y = 0.95;
       const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfbcfe8 }));
@@ -359,7 +421,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
       // 3. Mateus (Young Student with backpack)
       const studentGroup = new THREE.Group();
-      studentGroup.position.set(3.2, 0.91, 7.5);
+      studentGroup.position.set(3.8, 0.91, 7.5);
       const stTorso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.52, 0.2), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
       stTorso.position.y = 0.95;
       const stHead = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfbcfe8 }));
@@ -374,7 +436,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         new THREE.BoxGeometry(2.0, 0.4, 0.5),
         new THREE.MeshStandardMaterial({ color: 0xb45309 })
       );
-      bench.position.set(4.2, 0.91 + 0.2, -6.0);
+      bench.position.set(5.2, 0.91 + 0.2, -6.0);
       stGroup.add(bench);
 
       scene.add(stGroup);
