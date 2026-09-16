@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient: Emerald Rail Heritage to Deep Slate -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b" />
+      <stop offset="55%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#022c22" />
+    </linearGradient>
+
+    <!-- Brass / Gold Metallic Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="35%" stop-color="#f59e0b" />
+      <stop offset="70%" stop-color="#d97706" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+
+    <!-- Steel / Iron Metallic Gradient -->
+    <linearGradient id="steelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="50%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Headlight Radiant Glow -->
+    <radialGradient id="lampGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="30%" stop-color="#fef08a" />
+      <stop offset="70%" stop-color="#f59e0b" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#f59e0b" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Steam Cloud Gradient -->
+    <linearGradient id="steamGrad" x1="0%" y1="100%" x2="50%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#e2e8f0" stop-opacity="0.3" />
+    </linearGradient>
+
+    <!-- Drop Shadow Filter for 3D depth -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.5" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base with Border -->
+  <rect x="16" y="16" width="480" height="480" rx="108" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="8" />
+
+  <!-- Inner Ambient Glow Circle -->
+  <circle cx="256" cy="270" r="170" fill="#10b981" opacity="0.12" />
+
+  <!-- Steam Puffs rising from Chimney -->
+  <g filter="url(#shadow)">
+    <circle cx="256" cy="85" r="28" fill="url(#steamGrad)" />
+    <circle cx="290" cy="70" r="38" fill="url(#steamGrad)" />
+    <circle cx="340" cy="55" r="46" fill="url(#steamGrad)" />
+    <circle cx="395" cy="45" r="54" fill="url(#steamGrad)" opacity="0.6" />
+  </g>
+
+  <!-- Chimney (Chaminé) -->
+  <path d="M 232 170 L 240 115 L 272 115 L 280 170 Z" fill="url(#steelGrad)" stroke="#334155" stroke-width="3" />
+  <!-- Chimney Brass Crown -->
+  <ellipse cx="256" cy="115" rx="20" ry="6" fill="url(#goldGrad)" />
+
+  <!-- Driver Cab (Cabine traseira) -->
+  <path d="M 148 180 Q 256 160 364 180 L 372 320 L 140 320 Z" fill="#044e39" stroke="#065f46" stroke-width="4" />
+  <rect x="168" y="195" width="46" height="54" rx="8" fill="#38bdf8" opacity="0.85" />
+  <rect x="298" y="195" width="46" height="54" rx="8" fill="#38bdf8" opacity="0.85" />
+
+  <!-- Main Boiler Front / Smokebox (Caldeira cilíndrica) -->
+  <circle cx="256" cy="265" r="115" fill="url(#steelGrad)" stroke="url(#goldGrad)" stroke-width="6" />
+
+  <!-- Boiler Concentric Rings and Rivets -->
+  <circle cx="256" cy="265" r="95" fill="#1e293b" stroke="#334155" stroke-width="3" />
+  <circle cx="256" cy="265" r="85" fill="#0f172a" />
+
+  <!-- Steam Dome and Whistle behind boiler -->
+  <path d="M 200 172 Q 212 142 224 172 Z" fill="url(#goldGrad)" />
+  <rect x="296" y="145" width="8" height="28" fill="url(#goldGrad)" rx="2" />
+
+  <!-- Iconic Front Headlight (Farol Central de Alta Luminosidade) -->
+  <g filter="url(#shadow)">
+    <!-- Light Beam Flare -->
+    <polygon points="256,220 170,140 342,140" fill="url(#lampGlow)" opacity="0.35" />
+    <!-- Housing -->
+    <rect x="232" y="195" width="48" height="50" rx="8" fill="url(#steelGrad)" stroke="url(#goldGrad)" stroke-width="3" />
+    <ellipse cx="256" cy="220" rx="20" ry="20" fill="url(#lampGlow)" />
+    <circle cx="256" cy="220" r="11" fill="#ffffff" />
+  </g>
+
+  <!-- Number Plate / "JOINVILLE 1851" Brass Plaque -->
+  <rect x="216" y="278" width="80" height="22" rx="4" fill="url(#goldGrad)" stroke="#78350f" stroke-width="2" />
+  <text x="256" y="294" font-family="'JetBrains Mono', monospace, sans-serif" font-size="13" font-weight="900" fill="#451a03" text-anchor="middle" letter-spacing="1.5">JVL-3D</text>
+
+  <!-- Twin Steam Cylinders (Cilindros de Pistão) -->
+  <rect x="100" y="325" width="56" height="70" rx="10" fill="url(#steelGrad)" stroke="#475569" stroke-width="3" />
+  <circle cx="128" cy="360" r="18" fill="url(#goldGrad)" />
+
+  <rect x="356" y="325" width="56" height="70" rx="10" fill="url(#steelGrad)" stroke="#475569" stroke-width="3" />
+  <circle cx="384" cy="360" r="18" fill="url(#goldGrad)" />
+
+  <!-- Pilot / Cowcatcher (Limpa-trilhos em V) -->
+  <polygon points="256,430 135,395 155,380 256,395 357,380 377,395" fill="url(#steelGrad)" stroke="url(#goldGrad)" stroke-width="3" />
+  <!-- Pilot Vertical Grille Slats -->
+  <line x1="200" y1="392" x2="210" y2="418" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" />
+  <line x1="230" y1="394" x2="238" y2="425" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" />
+  <line x1="256" y1="395" x2="256" y2="430" stroke="url(#goldGrad)" stroke-width="5" stroke-linecap="round" />
+  <line x1="282" y1="394" x2="274" y2="425" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" />
+  <line x1="312" y1="392" x2="302" y2="418" stroke="url(#goldGrad)" stroke-width="4" stroke-linecap="round" />
+
+  <!-- Central Railway Coupler (Engate Central Ferroviário) -->
+  <rect x="242" y="380" width="28" height="24" rx="4" fill="#0f172a" stroke="url(#goldGrad)" stroke-width="2" />
+  <circle cx="256" cy="392" r="6" fill="#e2e8f0" />
+
+  <!-- Steel Rails at Bottom -->
+  <line x1="120" y1="465" x2="392" y2="465" stroke="#78350f" stroke-width="12" stroke-linecap="round" />
+  <rect x="145" y="445" width="22" height="20" fill="#94a3b8" rx="2" />
+  <rect x="345" y="445" width="22" height="20" fill="#94a3b8" rx="2" />
+</svg>

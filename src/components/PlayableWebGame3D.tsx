@@ -33,7 +33,12 @@ import {
   Flame,
   Check,
   Lock,
-  HeartPulse
+  HeartPulse,
+  Glasses,
+  VolumeX,
+  Sliders,
+  Type,
+  Sun
 } from 'lucide-react';
 import { playSteamWhistle, playBrakeHiss, playSteamChuff, playStationBell } from '../utils/soundEffects';
 import { JOINVILLE_STATIONS, CLEAN_STEAM_TECHNOLOGY } from '../data/joinvilleProject';
@@ -77,6 +82,28 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
   } | null>(null);
 
   const discoveredPartsRef = useRef<string[]>(['regulador_cupula']);
+
+  // Recursos de Acessibilidade para Idosos (Fonte Grande, Alto Contraste, Voz com Síntese de Áudio e Guia)
+  const [elderlyMode, setElderlyMode] = useState<boolean>(false);
+  const [highContrast, setHighContrast] = useState<boolean>(false);
+  const [largeText, setLargeText] = useState<boolean>(false);
+  const [voiceAssistance, setVoiceAssistance] = useState<boolean>(false);
+  const [showElderlyGuide, setShowElderlyGuide] = useState<boolean>(false);
+  const announcedStationRef = useRef<number | null>(null);
+
+  // Helper para sintetizar voz em português para acessibilidade de idosos
+  const speakAccessibility = (text: string) => {
+    if (!voiceAssistance || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'pt-BR';
+      utterance.rate = 0.9; // Levemente mais pausado para idosos
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Ignora silenciosamente se o navegador bloquear autoplay de voz
+    }
+  };
 
   // Gamepad State (PS4 DualShock 4 & PS5 DualSense)
   const [isGamepadConnected, setIsGamepadConnected] = useState<boolean>(false);
@@ -224,12 +251,30 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
     scene.add(sunLight);
 
     // 5. Procedural Track Spline (Curving through Joinville)
+    // As estações estão em t = 0.08, 0.28, 0.52, 0.76, 0.94.
+    // Aplicamos amortecimento nas estações para garantir trechos retos (tangente perfeita),
+    // eliminando qualquer desvio angular ou balanço centrífugo do vagão contra o passeio/estação.
+    const stationTs = [0.08, 0.28, 0.52, 0.76, 0.94];
     const curvePoints: THREE.Vector3[] = [];
     const totalSegments = 100;
     for (let i = 0; i <= totalSegments; i++) {
-      const z = (i / totalSegments) * 1200 - 600;
-      const x = Math.sin(i * 0.08) * 35 + Math.cos(i * 0.04) * 20;
-      const y = Math.sin(i * 0.05) * 2.5;
+      const tNorm = i / totalSegments;
+      const z = tNorm * 1200 - 600;
+      let rawX = Math.sin(i * 0.08) * 35 + Math.cos(i * 0.04) * 20;
+      let rawY = Math.sin(i * 0.05) * 2.5;
+
+      // Suavização dos trilhos nas zonas de aproximação e parada das plataformas
+      let straightFactor = 0;
+      for (const st of stationTs) {
+        const dist = Math.abs(tNorm - st);
+        if (dist < 0.04) {
+          const f = Math.cos((dist / 0.04) * (Math.PI / 2));
+          if (f > straightFactor) straightFactor = f;
+        }
+      }
+      // Amortecer curvas na estação para manter o trem e o vagão 100% alinhados paralelamente ao passeio
+      const x = rawX * (1 - straightFactor * 0.75);
+      const y = rawY * (1 - straightFactor * 0.8);
       curvePoints.push(new THREE.Vector3(x, y, z));
     }
     const trackCurve = new THREE.CatmullRomCurve3(curvePoints);
@@ -292,25 +337,55 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       stGroup.lookAt(stPt.clone().add(stTangent));
 
       // Raised Platform (NBR 9050 Level Boarding)
-      // Largura da plataforma: 4.6m, posicionada em X = 4.4, com borda segura em X = 2.1m
-      // Garante distância ideal de embarque em nível sem qualquer colisão com os cilindros ou rodas da locomotiva
+      // Gabarito ferroviário e passeio:
+      // A plataforma tem largura de 4.6m e centro em X = 5.15, com borda segura do passeio em X = 2.85m.
+      // O vagão azul tem largura de 2.08m (metade = 1.04m a partir do centro dos trilhos em X = 0).
+      // Isso proporciona uma folga visual e física ampla (> 1.8m livre) para circulação sem NUNCA encostar ou atravessar o passeio!
       const platGeom = new THREE.BoxGeometry(4.6, 0.9, 36);
       const platMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.7 });
       const platform = new THREE.Mesh(platGeom, platMat);
-      platform.position.set(4.4, 0.45, 0);
+      platform.position.set(5.15, 0.45, 0);
       stGroup.add(platform);
 
       // Tactile Paving Strip (Piso Podotátil de Alerta Amarelo NBR 9050)
       const tactileGeom = new THREE.BoxGeometry(0.35, 0.02, 36);
       const tactileMat = new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.5 });
       const tactile = new THREE.Mesh(tactileGeom, tactileMat);
-      tactile.position.set(2.45, 0.91, 0);
+      tactile.position.set(3.2, 0.91, 0);
       stGroup.add(tactile);
+
+      // Faixa Podotátil Direcional Azul de Encaminhamento para Idosos e PCD
+      const dirTactileGeom = new THREE.BoxGeometry(0.3, 0.02, 36);
+      const dirTactileMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 });
+      const dirTactile = new THREE.Mesh(dirTactileGeom, dirTactileMat);
+      dirTactile.position.set(4.6, 0.91, 0);
+      stGroup.add(dirTactile);
+
+      // Sistema Mecânico de Gap Filler Automático (Vão Zero) na borda da estação
+      const gapFillerGeom = new THREE.BoxGeometry(0.35, 0.06, 28);
+      const gapFillerMat = new THREE.MeshStandardMaterial({ color: 0x10b981, metalness: 0.7, roughness: 0.3 });
+      const gapFiller = new THREE.Mesh(gapFillerGeom, gapFillerMat);
+      gapFiller.position.set(2.88, 0.88, 0);
+      stGroup.add(gapFiller);
+
+      // Corrimão Duplo NBR 9050 para Apoio a Idosos na extensão da plataforma
+      const railMetalMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.8, roughness: 0.2 });
+      [0.7, 0.92].forEach(h => {
+        const handrail = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 34, 12), railMetalMat);
+        handrail.rotation.x = Math.PI / 2;
+        handrail.position.set(7.2, 0.91 + h, 0);
+        stGroup.add(handrail);
+      });
+      for (let hz = -16; hz <= 16; hz += 4) {
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.0, 8), railMetalMat);
+        post.position.set(7.2, 0.91 + 0.5, hz);
+        stGroup.add(post);
+      }
 
       // Edifício Histórico da Estação de Joinville (Alvenaria e Estilo Arquitetônico Ferroviário)
       const buildingMat = new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.8 }); // Terracota / Tijolos
       const stationBuilding = new THREE.Mesh(new THREE.BoxGeometry(3.6, 4.8, 28), buildingMat);
-      stationBuilding.position.set(8.5, 2.4, 0);
+      stationBuilding.position.set(9.2, 2.4, 0);
       stGroup.add(stationBuilding);
 
       // Telhado Germânico Colonial do Edifício de Passageiros
@@ -318,13 +393,13 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       const bRoof = new THREE.Mesh(new THREE.ConeGeometry(3.0, 1.8, 4), bRoofMat);
       bRoof.rotation.y = Math.PI / 4;
       bRoof.scale.set(1.4, 1.0, 7.2);
-      bRoof.position.set(8.5, 5.6, 0);
+      bRoof.position.set(9.2, 5.6, 0);
       stGroup.add(bRoof);
 
       // Portas e Acessos Arqueados para Passageiros
       [-8, 0, 8].forEach(wz => {
         const door = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 1.8), new THREE.MeshStandardMaterial({ color: 0x451a03 }));
-        door.position.set(6.65, 1.2, wz);
+        door.position.set(7.35, 1.2, wz);
         stGroup.add(door);
       });
 
@@ -340,7 +415,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         opacity: 0.8
       });
       const canopy = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.18, 34), canopyMat);
-      canopy.position.set(4.6, 6.0, 0);
+      canopy.position.set(5.3, 6.0, 0);
       canopy.rotation.z = -0.06; // Leve caimento para escoamento pluvial
       stGroup.add(canopy);
 
@@ -349,7 +424,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         new THREE.BoxGeometry(0.25, 0.25, 34),
         new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 })
       );
-      canopyRidge.position.set(2.3, 6.15, 0);
+      canopyRidge.position.set(3.0, 6.15, 0);
       stGroup.add(canopyRidge);
 
       // Pilares e Tesouras Metálicas Estruturais (Gabarito Ferroviário Livre)
@@ -357,37 +432,37 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       for (let pz = -14; pz <= 14; pz += 7) {
         // Pilar vertical recuado com segurança na plataforma
         const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 5.2, 12), pillarMat);
-        pillar.position.set(5.5, 3.5, pz);
+        pillar.position.set(6.2, 3.5, pz);
         stGroup.add(pillar);
 
         // Viga horizontal de suporte estrutural sob a marquise (Y = 5.9m)
         const trussBeam = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.12, 0.12), pillarMat);
-        trussBeam.position.set(4.0, 5.9, pz);
+        trussBeam.position.set(4.7, 5.9, pz);
         stGroup.add(trussBeam);
 
         // Mão-francesa de reforço estrutural
         const brace = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 8), pillarMat);
         brace.rotation.z = Math.PI / 4;
-        brace.position.set(4.7, 5.3, pz);
+        brace.position.set(5.4, 5.3, pz);
         stGroup.add(brace);
       }
 
       // Placa de Identificação da Estação (Fixada em altura segura com vão livre completo)
       const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.9, 5.2), new THREE.MeshStandardMaterial({ color: 0x0f172a }));
-      signMesh.position.set(3.8, 4.4, 0);
+      signMesh.position.set(4.5, 4.4, 0);
       stGroup.add(signMesh);
 
       const signBorder = new THREE.Mesh(
         new THREE.BoxGeometry(0.14, 0.95, 5.3),
         new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xd97706, emissiveIntensity: 0.4 })
       );
-      signBorder.position.set(3.78, 4.4, 0);
+      signBorder.position.set(4.48, 4.4, 0);
       stGroup.add(signBorder);
 
       // 3D PASSENGERS ON PLATFORM:
       // 1. Lucas (PCD Wheelchair User) at the level boarding position
       const wcGroup = new THREE.Group();
-      wcGroup.position.set(3.2, 0.91, 3.5);
+      wcGroup.position.set(3.6, 0.91, 3.5);
       wcGroup.rotation.y = -Math.PI / 2; // Facing the train
       [-0.28, 0.28].forEach(wx => {
         const wheel = new THREE.Mesh(
@@ -409,7 +484,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
       // 2. Dona Helena (Senior Passenger with walking cane)
       const seniorGroup = new THREE.Group();
-      seniorGroup.position.set(4.0, 0.91, -3.5);
+      seniorGroup.position.set(4.4, 0.91, -3.5);
       const sTorso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.2), new THREE.MeshStandardMaterial({ color: 0xd97706 }));
       sTorso.position.y = 0.95;
       const sHead = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfbcfe8 }));
@@ -421,7 +496,7 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
       // 3. Mateus (Young Student with backpack)
       const studentGroup = new THREE.Group();
-      studentGroup.position.set(3.8, 0.91, 7.5);
+      studentGroup.position.set(4.2, 0.91, 7.5);
       const stTorso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.52, 0.2), new THREE.MeshStandardMaterial({ color: 0x10b981 }));
       stTorso.position.y = 0.95;
       const stHead = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), new THREE.MeshStandardMaterial({ color: 0xfbcfe8 }));
@@ -431,13 +506,31 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       studentGroup.add(stTorso, stHead, backpack);
       stGroup.add(studentGroup);
 
-      // 4. Station Wooden Bench with middle armrests
+      // 4. Station Ergonomic Wooden Bench with armrests for seniors (NBR 9050)
       const bench = new THREE.Mesh(
-        new THREE.BoxGeometry(2.0, 0.4, 0.5),
+        new THREE.BoxGeometry(2.2, 0.45, 0.55),
         new THREE.MeshStandardMaterial({ color: 0xb45309 })
       );
-      bench.position.set(5.2, 0.91 + 0.2, -6.0);
-      stGroup.add(bench);
+      bench.position.set(5.6, 0.91 + 0.22, -6.0);
+      // Encosto e apoios de braço ergonômicos para idosos
+      const benchBack = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.45, 0.08), new THREE.MeshStandardMaterial({ color: 0x92400e }));
+      benchBack.position.set(5.6, 0.91 + 0.55, -6.24);
+      stGroup.add(bench, benchBack);
+      [-0.9, 0, 0.9].forEach(bx => {
+        const armrest = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.22, 0.45), railMetalMat);
+        armrest.position.set(5.6 + bx * 0.9, 0.91 + 0.48, -6.0);
+        stGroup.add(armrest);
+      });
+
+      // 5. Totem de Acessibilidade e Atendimento Preferencial a Idosos
+      const totemPost = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.2, 0.3), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
+      totemPost.position.set(4.2, 0.91 + 1.1, -1.0);
+      const totemSign = new THREE.Mesh(
+        new THREE.BoxGeometry(0.36, 0.7, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1d4ed8, emissiveIntensity: 0.3 })
+      );
+      totemSign.position.set(4.2, 0.91 + 1.6, -0.82);
+      stGroup.add(totemPost, totemSign);
 
       scene.add(stGroup);
       stationMeshes.push(stGroup);
@@ -639,7 +732,103 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
     condenser.userData = { partId: 'tender_suprimentos' };
     trainGroup.add(condenser);
 
-    // 10. Marcadores 3D Interativos (Beacons) sobre as Peças Mecânicas
+    const connectingLinkMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+    const connectingLink = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1, 8), connectingLinkMat);
+    scene.add(connectingLink);
+
+    // 10. Vagão de Passageiros 100% Acessível (Carro de Passageiros Joinville com NBR 9050 e Vão Zero)
+    // Conduzido de forma independente na spline (trackCurve), garantindo que o vagão siga perfeitamente os trilhos
+    // nas curvas e nunca colida ou atravesse lateralmente a plataforma da estação!
+    const coachGroup = new THREE.Group();
+    scene.add(coachGroup);
+
+    // Barra de Engate / Acoplamento Ferroviário Janney / Scharfenberg
+    const couplerMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+    const coupler = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.8, 8), couplerMat);
+    coupler.rotation.x = Math.PI / 2;
+    coupler.position.set(0, 0.65, 3.0);
+    coachGroup.add(coupler);
+
+    // Chassi e Truques Ferroviários (Bogie dianteiro e traseiro do vagão)
+    const bogieMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8, roughness: 0.3 });
+    [-2.2, 2.2].forEach(bogieZ => {
+      const bogieFrame = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.18, 1.6), bogieMat);
+      bogieFrame.position.set(0, 0.45, bogieZ);
+      coachGroup.add(bogieFrame);
+
+      // Rodas do truque
+      [-0.55, 0.55].forEach(wZ => {
+        [-0.8, 0.8].forEach(wX => {
+          const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.1, 16), wheelMat);
+          w.rotation.z = Math.PI / 2;
+          w.position.set(wX, 0.42, bogieZ + wZ);
+          coachGroup.add(w);
+        });
+      });
+    });
+
+    // Corpo Principal do Vagão (Largura refinada: 2.08m, Altura: 2.2m, Comprimento: 6.6m)
+    // Dimensão otimizada para gabarito ferroviário rigoroso, evitando qualquer contato ou travessia do passeio/estação
+    const coachBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.4 }); // Azul colonial ferroviário
+    const coachBody = new THREE.Mesh(new THREE.BoxGeometry(2.08, 2.2, 6.6), coachBodyMat);
+    coachBody.position.set(0, 1.85, 0);
+    coachGroup.add(coachBody);
+
+    // Faixa Dourada comemorativa "Joinville nos Trilhos - Acesso Universal"
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.6, roughness: 0.3 });
+    [-1.05, 1.05].forEach(sX => {
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.18, 6.4), stripeMat);
+      stripe.position.set(sX, 1.35, 0);
+      coachGroup.add(stripe);
+    });
+
+    // Telhado Arredondado do Vagão (Gabarito ferroviário contido)
+    const coachRoofMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.6 });
+    const coachRoof = new THREE.Mesh(new THREE.CylinderGeometry(1.08, 1.08, 6.6, 16, 1, false, 0, Math.PI), coachRoofMat);
+    coachRoof.rotation.z = Math.PI / 2;
+    coachRoof.rotation.y = Math.PI / 2;
+    coachRoof.position.set(0, 2.95, 0);
+    coachGroup.add(coachRoof);
+
+    // Janelas Panorâmicas de Alto Contraste (Ambos os lados)
+    const windowMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      metalness: 0.8,
+      roughness: 0.1,
+      transparent: true,
+      opacity: 0.75
+    });
+    [-1.06, 1.06].forEach(wX => {
+      for (let wz = -2.4; wz <= 2.4; wz += 1.2) {
+        const win = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.7, 0.85), windowMat);
+        win.position.set(wX, 2.05, wz);
+        coachGroup.add(win);
+      }
+    });
+
+    // Portas Duplas Amplas e Rampa de Nível para Idosos e Cadeirantes (Lado direito da plataforma)
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.5 });
+    const pDoor = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.8, 1.4), doorMat);
+    pDoor.position.set(1.05, 1.7, 0); // Porta no lado da plataforma
+    coachGroup.add(pDoor);
+
+    // Adesivo Internacional de Acessibilidade (Símbolo Azul/Branco) na lateral
+    const isaBadge = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.45, 0.45),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1d4ed8, emissiveIntensity: 0.3 })
+    );
+    isaBadge.position.set(1.06, 2.2, 1.2);
+    coachGroup.add(isaBadge);
+
+    // Sistema de Degrau Retrátil / Gap-Filler Automático no Vagão (Extensão de nível zero)
+    const coachGapFiller = new THREE.Mesh(
+      new THREE.BoxGeometry(0.25, 0.05, 1.5),
+      new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.7 })
+    );
+    coachGapFiller.position.set(1.15, 0.88, 0);
+    coachGroup.add(coachGapFiller);
+
+    // 11. Marcadores 3D Interativos (Beacons) sobre as Peças Mecânicas
     const beaconPins: THREE.Group[] = [];
     const beaconData = [
       { partId: 'chamine_exaustor', pos: [0, 3.8, 2.2] },
@@ -912,6 +1101,27 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
       trainGroup.position.copy(trainPos);
       trainGroup.lookAt(trainPos.clone().add(trainTangent));
 
+      // Update Blue Passenger Wagon (Coach) Position on Spline
+      // Distância física entre locomotiva e o centro do vagão de passageiros (~11.6m ao longo dos trilhos)
+      // O vagão viaja de forma independente na spline (trackCurve), garantindo que faça curvas
+      // perfeitamente centradas nos trilhos sem desvio angular e NUNCA encoste ou atravesse a estação!
+      const trackLengthEstimate = 1200; // Comprimento aproximado da curva
+      const coachOffsetProgress = 11.6 / trackLengthEstimate;
+      const coachProgress = (current.progress - coachOffsetProgress + 1.0) % 1.0;
+      const coachPos = trackCurve.getPointAt(coachProgress);
+      const coachTangent = trackCurve.getTangentAt(coachProgress);
+      coachGroup.position.copy(coachPos);
+      coachGroup.lookAt(coachPos.clone().add(coachTangent));
+
+      // Atualiza a posição e rotação da conexão entre a locomotiva (tender) e o vagão
+      const tenderBack = new THREE.Vector3(0, 0.65, -7.7).applyMatrix4(trainGroup.matrixWorld);
+      const coachFront = new THREE.Vector3(0, 0.65, 3.3).applyMatrix4(coachGroup.matrixWorld);
+      const linkDist = tenderBack.distanceTo(coachFront);
+      connectingLink.position.copy(tenderBack).lerp(coachFront, 0.5);
+      const direction = coachFront.clone().sub(tenderBack).normalize();
+      connectingLink.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      connectingLink.scale.set(1, linkDist, 1);
+
       // Emit Steam Puffs
       if (current.speed > 2 && Math.random() < 0.3) {
         const puff = new THREE.Mesh(puffGeometry, puffMaterial.clone());
@@ -961,18 +1171,30 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
             if (alignmentDeviation < 3.0) {
               setStationAlignmentFeedback(`Parada Perfeita! Vão Zero (Gap Filler) ativado com sucesso! (+200 pts)`);
               confetti({ particleCount: 30, spread: 60, origin: { y: 0.7 } });
+              if (announcedStationRef.current !== stIdx) {
+                announcedStationRef.current = stIdx;
+                const stName = JOINVILLE_STATIONS[stIdx]?.name || 'Estação';
+                speakAccessibility(`Atenção passageiros da melhor idade. Chegada à ${stName}. Desembarque em nível sem degraus liberado.`);
+              }
             } else {
               setStationAlignmentFeedback(`Parada realizada na estação. Desvio: ${(alignmentDeviation).toFixed(1)} cm.`);
+              if (announcedStationRef.current !== stIdx) {
+                announcedStationRef.current = stIdx;
+                const stName = JOINVILLE_STATIONS[stIdx]?.name || 'Estação';
+                speakAccessibility(`Chegada à ${stName}. Por favor, aguarde o alinhamento da plataforma.`);
+              }
             }
           }
+        } else if (announcedStationRef.current === stIdx && dist > 0.02) {
+          announcedStationRef.current = null;
         }
       });
 
       // Camera Positioning
       if (cameraMode === 'chase') {
-        const offset = new THREE.Vector3(0, 4.5, -12).applyMatrix4(trainGroup.matrixWorld);
+        const offset = new THREE.Vector3(0, 6.2, -18.5).applyMatrix4(trainGroup.matrixWorld);
         camera.position.lerp(offset, 0.1);
-        camera.lookAt(trainPos.clone().add(new THREE.Vector3(0, 1.5, 0)));
+        camera.lookAt(trainPos.clone().add(new THREE.Vector3(0, 1.8, -4.0)));
       } else if (cameraMode === 'cab') {
         const cabPos = new THREE.Vector3(0, 2.2, -1.8).applyMatrix4(trainGroup.matrixWorld);
         camera.position.copy(cabPos);
@@ -1247,6 +1469,39 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
             <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.2 rounded font-mono font-bold">Limpo</span>
           </button>
 
+          {/* Botão Modo Sênior / Acessibilidade para Idosos */}
+          <button
+            onClick={() => {
+              const nextMode = !elderlyMode;
+              setElderlyMode(nextMode);
+              if (nextMode) {
+                setLargeText(true);
+                setHighContrast(true);
+                setVoiceAssistance(true);
+                speakAccessibility("Modo Acessibilidade para Idosos ativado. Letras ampliadas, alto contraste e suporte por áudio prontos.");
+              } else {
+                setLargeText(false);
+                setHighContrast(false);
+                setVoiceAssistance(false);
+              }
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition shadow-xs ${
+              elderlyMode
+                ? 'bg-amber-500 text-slate-950 border-amber-600 ring-2 ring-amber-300'
+                : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+            }`}
+            title="Ativar Modo Idoso: Letras Grandes, Alto Contraste e Leitura em Voz Alta"
+            aria-pressed={elderlyMode}
+          >
+            <Glasses className="w-4 h-4 text-amber-700" />
+            <span>Modo Idoso / Sênior</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${
+              elderlyMode ? 'bg-slate-950 text-amber-300' : 'bg-amber-200 text-amber-900'
+            }`}>
+              {elderlyMode ? 'ATIVO' : 'ABNT'}
+            </span>
+          </button>
+
           {/* Locomotive Anatomy Educational Guide Button */}
           <button
             onClick={() => {
@@ -1424,6 +1679,85 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         </div>
       )}
 
+      {/* Painel de Acessibilidade Dedicado para Idosos e Melhor Idade */}
+      {elderlyMode && (
+        <div className="bg-amber-500 text-slate-950 p-3.5 sm:p-4 rounded-2xl border-2 border-amber-600 shadow-md flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-950 text-amber-300 flex items-center justify-center shrink-0">
+              <Glasses className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="font-extrabold text-sm sm:text-base flex items-center gap-2">
+                <span>Modo Melhor Idade & Acessibilidade Sênior Ativo</span>
+                <span className="bg-slate-950 text-amber-300 text-xs px-2 py-0.5 rounded-full font-mono">
+                  NBR 9050
+                </span>
+              </div>
+              <p className="text-xs text-slate-900 font-medium">
+                Controles simplificados de toque amplo, leitura por voz em português, alto contraste e embarque em nível sem vão.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={() => {
+                const next = !largeText;
+                setLargeText(next);
+                speakAccessibility(next ? "Letras ampliadas ativadas." : "Tamanho de letra padrão.");
+              }}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
+                largeText ? 'bg-slate-950 text-amber-300 border-slate-950' : 'bg-white text-slate-900 border-amber-600'
+              }`}
+            >
+              <Type className="w-4 h-4" />
+              <span>Letra Grande: {largeText ? 'SIM' : 'NÃO'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const next = !highContrast;
+                setHighContrast(next);
+                speakAccessibility(next ? "Alto contraste ativado." : "Contraste normal.");
+              }}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
+                highContrast ? 'bg-slate-950 text-amber-300 border-slate-950' : 'bg-white text-slate-900 border-amber-600'
+              }`}
+            >
+              <Sun className="w-4 h-4" />
+              <span>Alto Contraste: {highContrast ? 'SIM' : 'NÃO'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                const next = !voiceAssistance;
+                setVoiceAssistance(next);
+                if (next) {
+                  speakAccessibility("Assistente de voz em português ativado. Você ouvirá o nome das estações e alertas.");
+                }
+              }}
+              className={`px-3 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 border transition ${
+                voiceAssistance ? 'bg-slate-950 text-amber-300 border-slate-950' : 'bg-white text-slate-900 border-amber-600'
+              }`}
+            >
+              {voiceAssistance ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4" />}
+              <span>Voz Falada: {voiceAssistance ? 'LIGADA' : 'DESLIGADA'}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setShowElderlyGuide(true);
+                speakAccessibility("Abrindo guia completo de acessibilidade para a melhor idade.");
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-900 text-amber-300 font-bold text-xs flex items-center gap-1.5 shadow-sm transition"
+            >
+              <Info className="w-4 h-4" />
+              <span>Guia da Melhor Idade</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Faixa Interativa de Peças Mecânicas no Trajeto (Posicionada com espaço dedicado, sem sobrepor o jogo) */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-3 px-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70">
@@ -1508,27 +1842,29 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         {/* HUD Overlay - Barra Superior Unificada (Elementos alinhados sem colisão) */}
         <div className="absolute top-3 left-3 right-3 flex items-center justify-between gap-3 pointer-events-none z-20">
           {/* Telemetria e Velocímetro */}
-          <div className="bg-slate-900/90 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/80 text-white shadow-lg flex items-center gap-3 shrink-0 pointer-events-auto">
+          <div className={`${
+            highContrast ? 'bg-black text-amber-300 border-2 border-amber-400' : 'bg-slate-900/90 backdrop-blur-md text-white border-slate-700/80'
+          } px-3.5 py-2 rounded-2xl border shadow-lg flex items-center gap-3 shrink-0 pointer-events-auto transition-all`}>
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <div className={`text-[10px] uppercase tracking-wider font-bold ${highContrast ? 'text-amber-300' : 'text-slate-400'}`}>
                 Velocidade
               </div>
               <div className="flex items-baseline gap-1 font-mono">
-                <span className="text-2xl sm:text-3xl font-extrabold text-amber-400">
+                <span className={`${largeText ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'} font-extrabold ${highContrast ? 'text-yellow-300' : 'text-amber-400'}`}>
                   {speedKmh}
                 </span>
-                <span className="text-[10px] text-slate-400 font-sans">km/h</span>
+                <span className={`text-[10px] font-sans ${highContrast ? 'text-amber-300' : 'text-slate-400'}`}>km/h</span>
               </div>
             </div>
-            <div className="h-8 w-px bg-slate-700" />
+            <div className={`h-8 w-px ${highContrast ? 'bg-amber-400' : 'bg-slate-700'}`} />
             <div>
-              <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">
+              <div className={`text-[10px] uppercase tracking-wider font-bold ${highContrast ? 'text-amber-300' : 'text-slate-400'}`}>
                 Regulador
               </div>
-              <div className="text-xs sm:text-sm font-mono font-bold text-emerald-400">
+              <div className={`font-mono font-bold ${largeText ? 'text-sm sm:text-base' : 'text-xs sm:text-sm'} ${highContrast ? 'text-emerald-300' : 'text-emerald-400'}`}>
                 {throttle}%
               </div>
-              <div className="text-[9px] text-slate-400 font-semibold">
+              <div className={`text-[9px] font-semibold ${highContrast ? 'text-white' : 'text-slate-400'}`}>
                 {brakeApplied ? 'FREIO ATIVO' : 'TRACIONANDO'}
               </div>
             </div>
@@ -1709,25 +2045,31 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
         {/* Controles Touch & Mobile no Rodapé (Perfeitamente espaçados sem sobrepor elementos) */}
         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-2 pointer-events-auto select-none z-20">
           {/* Regulador de Vapor (Polegar Esquerdo) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-900/90 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-slate-700/90 shadow-lg">
+          <div className={`flex items-center gap-1.5 sm:gap-2 ${
+            highContrast ? 'bg-black border-2 border-amber-400 text-white' : 'bg-slate-900/90 backdrop-blur-md border border-slate-700/90'
+          } p-1.5 sm:p-2.5 rounded-2xl shadow-lg transition-all`}>
             <button
               onClick={() => setThrottle(t => Math.max(0, t - 15))}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-base flex items-center justify-center active:scale-95 transition touch-manipulation"
+              className={`${
+                largeText ? 'w-12 h-12 sm:w-14 sm:h-14 text-xl' : 'w-10 h-10 sm:w-11 sm:h-11 text-base'
+              } rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-extrabold flex items-center justify-center active:scale-95 transition touch-manipulation`}
               title="Diminuir Vapor"
               aria-label="Diminuir Vapor"
             >
               -
             </button>
-            <div className="px-1.5 text-center min-w-[50px] sm:min-w-[60px]">
-              <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-semibold">Vapor</span>
-              <span className="font-mono text-sm sm:text-base font-extrabold text-amber-400">{throttle}%</span>
+            <div className="px-1.5 text-center min-w-[50px] sm:min-w-[65px]">
+              <span className={`text-[9px] uppercase tracking-wider block font-semibold ${highContrast ? 'text-amber-300' : 'text-slate-400'}`}>Vapor</span>
+              <span className={`font-mono ${largeText ? 'text-base sm:text-lg' : 'text-sm sm:text-base'} font-extrabold text-amber-400`}>{throttle}%</span>
             </div>
             <button
               onClick={() => {
                 setThrottle(t => Math.min(100, t + 15));
                 setBrakeApplied(false);
               }}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-base flex items-center justify-center active:scale-95 transition touch-manipulation shadow-sm"
+              className={`${
+                largeText ? 'w-12 h-12 sm:w-14 sm:h-14 text-xl' : 'w-10 h-10 sm:w-11 sm:h-11 text-base'
+              } rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold flex items-center justify-center active:scale-95 transition touch-manipulation shadow-sm`}
               title="Acelerar Vapor"
               aria-label="Acelerar Vapor"
             >
@@ -1754,7 +2096,11 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
             {/* Botão Reiniciar no Touch */}
             <button
               onClick={handleRestart}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-amber-400 flex items-center justify-center active:scale-95 transition shadow-sm touch-manipulation"
+              className={`${
+                largeText ? 'w-12 h-12 sm:w-13 sm:h-13' : 'w-10 h-10 sm:w-11 sm:h-11'
+              } rounded-xl ${
+                highContrast ? 'bg-black border-2 border-amber-400 text-amber-300' : 'bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-amber-400'
+              } flex items-center justify-center active:scale-95 transition shadow-sm touch-manipulation`}
               title="Reiniciar Viagem (Tecla R)"
               aria-label="Reiniciar Viagem"
             >
@@ -1763,7 +2109,11 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
             <button
               onClick={handleBell}
-              className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-amber-300 flex items-center justify-center active:scale-95 transition shadow-sm touch-manipulation"
+              className={`${
+                largeText ? 'w-12 h-12 sm:w-13 sm:h-13' : 'w-10 h-10 sm:w-11 sm:h-11'
+              } rounded-xl ${
+                highContrast ? 'bg-black border-2 border-amber-400 text-amber-300' : 'bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-amber-300'
+              } flex items-center justify-center active:scale-95 transition shadow-sm touch-manipulation`}
               title="Tocar Sino"
               aria-label="Tocar Sino"
             >
@@ -1772,7 +2122,9 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
 
             <button
               onClick={handleWhistle}
-              className="px-3 sm:px-4 h-10 sm:h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition shadow-md touch-manipulation"
+              className={`${
+                largeText ? 'px-4 sm:px-5 h-12 sm:h-13 text-sm' : 'px-3 sm:px-4 h-10 sm:h-11 text-xs'
+              } rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold flex items-center gap-1.5 active:scale-95 transition shadow-md touch-manipulation`}
               title="Apitar"
               aria-label="Apitar"
             >
@@ -1797,7 +2149,9 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
                 touchBrakeRef.current = false;
                 setBrakeApplied(false);
               }}
-              className={`px-3.5 sm:px-5 h-10 sm:h-11 rounded-xl font-bold text-xs flex items-center gap-1 active:scale-95 transition shadow-lg touch-manipulation ${
+              className={`${
+                largeText ? 'px-4 sm:px-6 h-12 sm:h-13 text-sm' : 'px-3.5 sm:px-5 h-10 sm:h-11 text-xs'
+              } rounded-xl font-bold flex items-center gap-1 active:scale-95 transition shadow-lg touch-manipulation ${
                 brakeApplied
                   ? 'bg-red-600 text-white animate-pulse'
                   : 'bg-red-500/95 hover:bg-red-600 text-white'
@@ -2343,6 +2697,116 @@ export default function PlayableWebGame3D({ onOpenDialog }: Props) {
                 className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition shadow-xs"
               >
                 Concluir Leitura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Educativo e de Instruções de Acessibilidade para Idosos (Melhor Idade) */}
+      {showElderlyGuide && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border-4 border-amber-500 animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="p-5 bg-amber-500 text-slate-950 flex items-center justify-between border-b-2 border-amber-600">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-slate-950 text-amber-300 flex items-center justify-center font-bold text-xl">
+                  <Glasses className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-extrabold text-slate-950 flex items-center gap-2">
+                    Recursos de Acessibilidade para a Melhor Idade
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-900 font-medium">
+                    Normas NBR 9050, ergonomia, conforto visual e navegação facilitada
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowElderlyGuide(false)}
+                className="w-10 h-10 rounded-xl bg-slate-950 text-amber-300 hover:bg-slate-900 flex items-center justify-center text-base font-extrabold transition shadow-sm"
+                aria-label="Fechar Guia da Melhor Idade"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-slate-800">
+              <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 space-y-2">
+                <h4 className="font-extrabold text-amber-900 text-base flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-amber-700" />
+                  Garantias de Acessibilidade Ferroviária
+                </h4>
+                <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                  Este projeto foi modelado para garantir que idosos, passageiros com mobilidade reduzida e seus acompanhantes tenham autonomia, segurança e dignidade em todas as etapas da viagem ferroviária:
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Embarque em Nível (Vão Zero)
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Plataforma e piso do vagão ficam exatamente na mesma altura (91 cm), eliminando degraus e o risco de tropeços para idosos com bengala ou andador.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Pisos Podotáteis NBR 9050
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Faixas podotáteis amarelas de alerta e azuis direcionais guiam o fluxo com segurança até as portas largas do vagão.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Voz com Leitura em Português
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Avisos sonoros claros anunciam a chegada às estações históricas de Joinville e o acionamento dos freios para quem tem baixa visão.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="font-bold text-sm text-slate-900 mb-1 flex items-center gap-2">
+                    <Check className="w-4 h-4 text-emerald-600" />
+                    Assentos com Braços de Apoio
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Bancos ergonômicos com altura correta e apoios laterais facilitam o sentar e levantar para quem tem dores articulares.
+                  </p>
+                </div>
+              </div>
+
+              {/* Dica de Uso no Jogo */}
+              <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950">
+                <div className="font-bold text-sm mb-1 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-600" />
+                  Dica de Condução Suave para o Maquinista:
+                </div>
+                <p className="text-xs sm:text-sm text-indigo-900 leading-relaxed">
+                  Para o conforto dos idosos a bordo do vagão de passageiros, mantenha a velocidade em torno de 25 a 35 km/h no perímetro urbano e use o freio com antecedência para uma parada sem solavancos na Estação.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+              <span className="text-xs text-slate-600 font-semibold">
+                Joinville Acessível — Melhor Idade nos Trilhos
+              </span>
+              <button
+                onClick={() => setShowElderlyGuide(false)}
+                className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold text-xs shadow-sm transition"
+              >
+                Entendido
               </button>
             </div>
           </div>

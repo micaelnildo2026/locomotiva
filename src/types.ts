@@ -107,4 +107,5 @@ export type ActiveTab =
   | 'network'
   | 'characters'
   | 'freecad'
-  | 'unreal';
+  | 'unreal'
+  | 'references';

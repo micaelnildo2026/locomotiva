@@ -14,6 +14,7 @@ import PlayableWebGame3D from './components/PlayableWebGame3D';
 import CharacterInteractions from './components/CharacterInteractions';
 import FreeCadModal from './components/FreeCadModal';
 import UnrealPublicationHub from './components/UnrealPublicationHub';
+import ReferencesPage from './components/ReferencesPage';
 import { 
   Gamepad2, 
   Box, 
@@ -186,6 +187,18 @@ export default function App() {
               <Layers className="w-4 h-4" />
               Unreal Engine 5 & Publicação
             </button>
+
+            <button
+              onClick={() => setActiveTab('references')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+                activeTab === 'references'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              Referências ABNT
+            </button>
           </div>
         </div>
       </header>
@@ -229,6 +242,10 @@ export default function App() {
 
         {activeTab === 'unreal' && (
           <UnrealPublicationHub />
+        )}
+
+        {activeTab === 'references' && (
+          <ReferencesPage />
         )}
       </main>
 
