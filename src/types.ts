@@ -108,4 +108,5 @@ export type ActiveTab =
   | 'characters'
   | 'freecad'
   | 'unreal'
-  | 'references';
+  | 'references'
+  | 'legal';

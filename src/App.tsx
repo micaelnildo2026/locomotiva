@@ -15,6 +15,7 @@ import CharacterInteractions from './components/CharacterInteractions';
 import FreeCadModal from './components/FreeCadModal';
 import UnrealPublicationHub from './components/UnrealPublicationHub';
 import ReferencesPage from './components/ReferencesPage';
+import LegalPage from './components/LegalPage';
 import { 
   Gamepad2, 
   Box, 
@@ -247,6 +248,10 @@ export default function App() {
         {activeTab === 'references' && (
           <ReferencesPage />
         )}
+
+        {activeTab === 'legal' && (
+          <LegalPage />
+        )}
       </main>
 
       {/* FreeCAD Python Macro Modal */}
@@ -258,19 +263,27 @@ export default function App() {
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-6 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-center gap-2">
             <span className="font-bold text-slate-800">
               Joinville nos Trilhos
             </span>
-            <span>•</span>
+            <span className="hidden sm:inline">•</span>
             <span>Patrimônio Ferroviário, Engenharia & Acessibilidade Universal</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span>Conformidade ABNT NBR 9050:2020</span>
-            <span>•</span>
-            <span>FreeCAD v0.21 / v1.0</span>
-            <span>•</span>
-            <span>Unreal Engine 5.4</span>
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex items-center gap-4">
+              <span>Conformidade ABNT NBR 9050:2020</span>
+              <span className="hidden sm:inline">•</span>
+              <span>FreeCAD v0.21 / v1.0</span>
+            </div>
+            
+            <button 
+              onClick={() => setActiveTab('legal')}
+              className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-medium cursor-pointer active:scale-95"
+            >
+              <Code className="w-3.5 h-3.5" />
+              Ver Código Fonte (MIT) / Políticas
+            </button>
           </div>
         </div>
       </footer>
